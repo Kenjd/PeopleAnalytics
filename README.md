@@ -28,6 +28,11 @@ While this repository is mainly for providing datasets used in our videos, we ap
     Submitting an issue via the 'Issues' tab.
     Making a pull request with your proposed changes.
 
+YouTube Channel Video
+
+If you are interested, here is a link to the YouTube video where this data is used.
+https://youtu.be/UWQ0zI3sBc8
+
 Contact Us
 
 For further questions, please reach out via our YouTube channel or drop us an email at insightspeopleanalytics@gmail.com
