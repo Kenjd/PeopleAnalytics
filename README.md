@@ -33,9 +33,6 @@ YouTube Channel Video
 If you are interested, here is a link to the first YouTube video, HR Salary Analysis, where this data is used.
 https://youtu.be/UWQ0zI3sBc8
 
-For video 6-2 content, Analyzing Salaries in R Markdown, ckick the links below:
-
-
 Contact Us
 
 For further questions, please reach out via our YouTube channel or drop us an email at insightspeopleanalytics@gmail.com
