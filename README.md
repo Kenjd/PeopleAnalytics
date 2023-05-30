@@ -30,8 +30,11 @@ While this repository is mainly for providing datasets used in our videos, we ap
 
 YouTube Channel Video
 
-If you are interested, here is a link to the YouTube video where this data is used.
+If you are interested, here is a link to the first YouTube video, HR Salary Analysis, where this data is used.
 https://youtu.be/UWQ0zI3sBc8
+
+For video 6-2 content, Analyzing Salaries in R Markdown, ckick the links below:
+
 
 Contact Us
 
