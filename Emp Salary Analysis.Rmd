@@ -1,0 +1,273 @@
+---
+title: "Employee Salary Analysis"
+author: "Ken Dafoe"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    css: styles.css
+---
+
+```{r Load Data, echo=FALSE, include=FALSE}
+library(readxl)
+library(janitor)
+employee <- read_xlsx("Employee Salaries - ONLY.xlsx")
+emp_salaries <- employee
+emp_salaries <- clean_names(emp_salaries)
+```
+
+
+```{r New salaries, eval=FALSE, include=FALSE}
+# Add 2 new salaries
+new_salary1 <- c(22000)
+new_salary2 <- c(161000)
+
+# Create a data frame with these new salaries
+# new_salaries <- data.frame(annual_salary = c(new_salary1, new_salary2))
+# Append new_salaries to emp_salaries
+# emp_salaries <- rbind(emp_salaries, new_salaries)
+
+```
+
+
+```{r Descriptives, include=FALSE}
+library(psych)
+e_sum <- describe(emp_salaries$annual_salary)
+e_sumsal <- sum(emp_salaries)
+```
+
+
+```{r Bin Range, message=FALSE, warning=FALSE, include=FALSE}
+
+# Load the libraries
+library(knitr)
+library(kableExtra)
+
+# Define the bin width and breaks
+bin_width <- 20000
+min_salary <- e_sum$min
+max_salary <- e_sum$max
+
+bins <- seq(min_salary, max_salary + bin_width, by = bin_width)
+
+# Create bin labels
+bin_labels <- paste(formatC(bins[-length(bins)], format = "f", digits = 0, big.mark = ","),
+                    formatC(bins[-length(bins)] + bin_width, format = "f", digits = 0, big.mark = ","), sep=" - ")
+
+# Cut the salary data into bins
+salary_bins <- cut(emp_salaries$annual_salary, breaks = bins, labels = bin_labels, include.lowest = TRUE)
+
+# Count the frequencies
+bin_counts <- table(salary_bins)
+
+# Convert to a data frame
+bin_counts_df <- as.data.frame(bin_counts)
+names(bin_counts_df) <- c("Salary Range", "Frequency")
+
+# Create a table
+knitr::kable(bin_counts_df, "html") %>%
+  kable_styling(bootstrap_options = "striped", full_width = F)
+```
+
+
+```{r Percentile 70th, include=FALSE}
+#Sum Frequencies
+bottom <- round(sum(bin_counts_df[1:3,"Frequency"])/e_sum[[2]],2)
+top <- round(sum(bin_counts_df[-c(1:3),"Frequency"])/e_sum[[2]],2)
+
+#Count of Frequencies
+low1 <- sum(bin_counts_df[1:3,"Frequency"])
+high1 <- sum(bin_counts_df[-c(1:3),"Frequency"])
+
+# Calculate the 70th percentile of annual_salary
+p70 <- quantile(emp_salaries$annual_salary, 0.7)
+p70 <- round(p70/1000)*1000
+
+
+# Sum of annual_salary values less than or equal to the 70th percentile
+sum_below_p70 <- round(sum(emp_salaries$annual_salary[emp_salaries$annual_salary <= p70]),2)
+pcent_below_p70 <- round(sum_below_p70/e_sumsal*100,0)
+
+# Sum of annual_salary values greater than or equal to the 70th percentile
+sum_above_p70 <- round(sum(emp_salaries$annual_salary[emp_salaries$annual_salary >= p70]),2)
+pcent_above_p70 <- round(sum_above_p70/e_sumsal*100,0)
+```
+
+
+```{r Inequality, include=FALSE}
+# Gini coefficient
+library(ineq)
+gini_coefficient <- Gini(emp_salaries$annual_salary)
+
+# Employee Counts
+emp_count <- length(emp_salaries$annual_salary)
+# Calculate the index corresponding to the top 10% and bottom 40% of employees
+top_10_index <- round(emp_count * 0.1)
+bottom_40_index <- round(emp_count * 0.4)
+
+# Calculate the number of employees at each percentile
+num_employees_top_10 <- emp_count - top_10_index + 1
+num_employees_bottom_40 <- bottom_40_index
+
+# Calculate the Palma Index
+palma_index <- function(income_vector) {
+  sorted_income <- sort(income_vector)
+  n <- length(sorted_income)
+  top_10_percent <- quantile(sorted_income, 0.9)
+  bottom_40_percent <- quantile(sorted_income, 0.4)
+  
+  top_10_income <- sum(sorted_income[sorted_income >= top_10_percent])
+  bottom_40_income <- sum(sorted_income[sorted_income <= bottom_40_percent])
+  
+  palma <- top_10_income / bottom_40_income
+  return(palma)
+}
+
+palma_i <- palma_index(emp_salaries$annual_salary)
+```
+
+
+```{r Outliers, include=FALSE}
+z_scores <- scale(emp_salaries$annual_salary)
+outliers <- which(abs(z_scores) > 3)
+outliers
+
+Q1 <- quantile(emp_salaries$annual_salary, 0.25)
+Q3 <- quantile(emp_salaries$annual_salary, 0.75)
+IQR <- Q3 - Q1
+IQR_outliers <- which(emp_salaries$annual_salary < Q1 - 1.5 * IQR | emp_salaries$annual_salary > Q3 + 1.5 * IQR)
+IQR_outliers
+
+# Geometric Mean of annual_salaries
+geometric_mean <- round(exp(mean(log(emp_salaries$annual_salary)))/1000,0)
+```
+
+
+```{r Distributions, warning=FALSE, include=FALSE}
+library(fitdistrplus)
+
+# Extract the salary column
+salaries <- emp_salaries$annual_salary
+
+# Remove NA values
+salaries <- salaries[!is.na(salaries)]
+# Remove Inf and -Inf values
+salaries <- salaries[is.finite(salaries)]
+# Now try fitting again
+# fit_norm <- fitdist(salaries, "norm")
+
+# Fit different candidate distributions to the data
+fit_norm <- fitdist(salaries, "norm")
+fit_lognorm <- fitdist(salaries, "lnorm")
+fit_logis <- fitdist(salaries, "logis")
+
+# Compare the goodness-of-fit using AIC
+gof_norm <- gofstat(fit_norm)
+gof_lognorm <- gofstat(fit_lognorm)
+gof_logis <- gofstat(fit_logis)
+
+# Visualize the goodness-of-fit using density function comparison
+denscomp(list(fit_norm, fit_lognorm, fit_logis), main = "Density comparison")
+```
+
+
+```{r Normality Tests, include=FALSE}
+# Tests for data normality
+# Shapiro-Wilk test
+shapiro_test_result <- shapiro.test(emp_salaries$annual_salary)[2]
+shapiro_f <- sprintf("%.3f", shapiro_test_result)
+
+# Create function to adjust p-value
+adjust_pvalue <- function(pvalue) {
+  if (pvalue < 0.001) {
+    return(0.001)
+  } else {
+    return(pvalue)
+  }
+}
+
+adj_shapiro_f <- adjust_pvalue(shapiro_f)
+
+# Lilliefors (Kolmogorov-Smirnov) normality test
+library(nortest)
+lillie_test_result <- lillie.test(emp_salaries$annual_salary)[2]
+lillie_f <- sprintf("%.3f", lillie_test_result)
+
+adj_kol_f <- adjust_pvalue(lillie_f)
+```
+<p></p>
+<p class="tight-paragraphs">This company has `r e_sum[[2]]` employees.</p>
+<p class="tight-paragraphs">The sum of all salaries is $`r round(e_sumsal/1000000,1)`mil.</p>
+<p class="tight-paragraphs">The average salary is $`r round(e_sum[[3]]/1000,0)`k.</p>
+<p class="tight-paragraphs">The minimum salary is \$`r round(min(emp_salaries$annual_salary)/1000,0)`k.</p>
+<p class="tight-paragraphs">The maximum salary is \$`r round(max(emp_salaries$annual_salary)/1000,0)`k.</p>
+<p class="tight-paragraphs">Which gives a range of $`r round(e_sum[[10]]/1000,0)`k.</p>
+<p class="tight-paragraphs">With a wide dispersion supported by a standard deviation of $`r round(e_sum[[4]]/1000,0)`k.</p><p></p>
+
+*A visualization of the salaries in the histogram shows us two things: One is that the income distribution is positively skewed. This suggests a non-normal distribution supported by a series of fit tests that confirm a log-normal distribution with the lowest AIC of* `r round(gof_lognorm$aic[1],1)` *as the best fit.*
+*And two, the histogram shows a majority of* `r sum(bin_counts_df[1:3,"Frequency"])` *employees below the 70th percentile of* $`r round(p70[[1]]/1000,0)`k, *and* `r sum(bin_counts_df[4:7,"Frequency"])` *employees above.*
+
+Two data normality tests, Shapiro-Wilk (p-value <`r adj_shapiro_f`) and Kolmogorov-Smirnov (p-value <`r adj_kol_f`), both display a p-value <.05 confirming that the salary data significantly deviates from a normal distribution.
+
+With this knowledge, we performed a log-normal transformation of the salaries to a geometric mean of \$`r round(exp(mean(log(emp_salaries$annual_salary)))/1000,0)`k, indicating a few high-income earners are driving up the average in the original dataset, even with a outlier count of `r ifelse(length(outliers) == 0, print(0), outliers)`. In this context the median salary of \$`r round(median(emp_salaries$annual_salary)/1000,0)`k is a better representative central value.
+
+```{r Frequencies, echo=FALSE, include=TRUE}
+hist(emp_salaries$annual_salary, breaks = 6, freq = T,
+     col = "blue", main = "Histogram of Annual Salaries",
+     xlab = "", ylab = "")
+abline(v = p70, col = "orange", lwd = 2)
+text(x = p70, y = max(hist(emp_salaries$annual_salary, breaks = 6, plot = FALSE)$counts), labels = paste0(p70/1000, "k"), adj = c(0,1), col = "orange")
+```
+
+In fact, `r pcent_below_p70`% of the sum of all salaries are below \$`r round(p70[[1]]/1000,0)`k, while `r pcent_above_p70`% are above.
+
+
+*This knowledge indicates a possible inequality in the income distribution of the company, supported by a Lorenz curve showing a moderate bowing in the salaries from the orange line of equality.*
+
+```{r Lorenz curve, echo=FALSE,include=TRUE}
+
+# Load the ineq package
+library(ineq)
+
+# Assuming emp_salaries$annual_salary is your vector of salaries
+salaries <- emp_salaries$annual_salary
+
+# Compute the Lorenz curve
+Lc <- Lc(salaries)
+
+# Plot the Lorenz curve
+plot(Lc, main="Lorenz Curve", xlab="Population Percentage", 
+     ylab="Cumulative Salary", col = "blue")
+
+# Add the line of perfect equality
+abline(0, 1, lty=1, col = "orange")
+
+```
+
+Closer examination of the data shows a Gini coefficient of `r round(gini_coefficient,2)`, indicating a moderate inequality in the distribution of income within the company.
+Also, the Palma index scores `r round(palma_i,2)`, which indicates that the top 10% of earners hold `r round(palma_i,2)*100`% of the salaries of the bottom 40% of employees.
+
+To summarize our key findings:
+
+- <p class="tight-paragraphs"> `r e_sum[[2]]` employees earn $`r round(e_sumsal/1000000,1)`mil in income.</p>
+- <p class="tight-paragraphs"> The central measure of this income is the median salary of \$`r round(median(emp_salaries$annual_salary)/1000,0)`k.</p>
+- <p class="tight-paragraphs"> A Palma index of the salaries shows the top 10% of earners hold `r round(palma_i,2)*100`% of the salaries of the bottom 40% of employees.</p>
+- <p class="tight-paragraphs"> Salary inequality is more pronounced below the 40th percentile, since there are `r bottom_40_index` employees in this income percentile, versus `r top_10_index` employees in the top 10% of income earners.</p><p></p>
+
+
+<font size="4">*It is important to recognize that a more thorough investigation on employee salaries would need additional information about the job titles, departments, and levels of responsibility within the company, as well as the distribution of salaries across these different categories.*</font>
+
+
+From these findings, we propose the following actions:
+
+**Income inequality investigation**
+<p class="tight-paragraphs">Would involve looking at factors such as job roles, years of experience, education level, and performance ratings.</p>
+
+**Salary Review**
+<p class="tight-paragraphs">Given the high standard deviation and coefficient of variation, it might be beneficial to review the company's salary structure. Are there valid reasons for the wide range of salaries? Are certain roles underpaid or overpaid relative to the market?</p>
+
+**Salary Banding**
+<p class="tight-paragraphs">If it's not already in place. This could help to ensure that employees in similar roles with similar experience and performance levels are paid within a certain range of each other.</p>
+
+**Performance Based Pay**
+<p class="tight-paragraphs">If not already in place, consider implementing a performance-based pay system. This could help to ensure that high-performing employees are rewarded appropriately.</p><p></p>
+
